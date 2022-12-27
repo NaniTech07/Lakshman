@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd">
+	    <http:request-config name="HTTPS_dummy_text" doc:name="HTTP Request configuration" doc:id="637c20dc-491d-4534-8e5e-d271a2d4df6f">
+		<http:request-connection host="anypoint.mulesoft.com/mocking/api/v1/sources/exchange/assets/d62c7af1-de8e-416d-aad4-3f7b5916496e/openlogix-slackplublisher-lakshman/1.0.1/m" protocol="HTTPS">
+			<tls:context >
+				<tls:trust-store insecure="true" />
+				<tls:key-store type="jks" path="mule.jks" keyPassword="password" password="password" />
+			</tls:context>
+		</http:request-connection>
+	</http:request-config>
+	<flow name="slack-publisher1" doc:id="50ef8d41-f910-4125-b3a2-c80d123fcf47" >
+			<http:request method="POST" doc:name="Slack-Sapi" doc:id="21455949-2189-49cc-a5c4-6b00b5cf2397" path="/message" config-ref="Slack-Request">
+			<http:body ><![CDATA[#[{
+  "text": payload,
+  "channel": "U046DD1DBC1"
+}]]]></http:body>
+			<http:headers ><![CDATA[#[output application/json
+---
+{
+	"clientSecret" : "${slack.clientSecret}",
+	"clientId" : "${slack.clientId}",
+	"scope" : "${slack.scopes}",
+	"Content-Type":"application/json"
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="9e364d65-e4ab-4267-be25-4b62b0c713bb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="slackpublisherFlow" doc:id="0ce5faab-ba15-4aa4-9303-248291e4c652" >
+		<scheduler doc:name="PAPI" doc:id="0db40312-0aaa-427e-92d7-013e85fca96c" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="5" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<http:request method="GET" doc:name="State" doc:id="fc1fd3c7-b9c5-4862-b4cd-4ebf2be0f530" outputMimeType="application/json" url="${state.url}">
+			<http:headers ><![CDATA[#[output application/json
+---
+{
+	clientId : "Test",
+	clientSecret : "Value"
+}]]]></http:headers>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="e1bb2acc-97b4-4765-ad10-6bf2c35f6be6" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="514a332e-51e0-4649-93a0-1901bacaeaa8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="651fe86b-afad-484c-b7b6-f430bb2c07c7" >
+			<when expression='#[payload.currentStatus=="waiting"]'>
+				<ee:transform doc:name="Transform Message" doc:id="dd39b0c5-d3b5-4d19-89ed-9c8d0fa7f7f2" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"I am Ready to trigger"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="State Change" doc:id="6428a8e3-f0e9-448c-95c5-6bdf498d00a5" name="DummyTextFlow"/>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="422ed736-6256-41b1-9b32-794952e43daa" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"System is not ready , Kindly try after some time"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	
+	
+</mule>
